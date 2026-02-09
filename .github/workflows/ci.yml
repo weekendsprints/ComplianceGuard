@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run tests with coverage
+        run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.txt
+          retention-days: 7
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+
+      - name: Build application
+        run: go build -v .
+
+      - name: Verify multi-platform compilation
+        run: |
+          echo "Verifying darwin/amd64..."
+          GOOS=darwin GOARCH=amd64 go build -o /dev/null .
+          
+          echo "Verifying darwin/arm64..."
+          GOOS=darwin GOARCH=arm64 go build -o /dev/null .
+          
+          echo "Verifying linux/amd64..."
+          GOOS=linux GOARCH=amd64 go build -o /dev/null .
+          
+          echo "Verifying linux/arm64..."
+          GOOS=linux GOARCH=arm64 go build -o /dev/null .
+          
+          echo "Verifying windows/amd64..."
+          GOOS=windows GOARCH=amd64 go build -o /dev/null .
+          
+          echo "Verifying windows/arm64..."
+          GOOS=windows GOARCH=arm64 go build -o /dev/null .

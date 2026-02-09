@@ -1,4 +1,4 @@
-name: Publish Release
+name: Release
 
 on:
   push:
@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  publish:
-    name: Publish Release to GitHub
+  release:
+    name: Build and Publish Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
