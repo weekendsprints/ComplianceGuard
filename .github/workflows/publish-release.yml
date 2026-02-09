@@ -1,0 +1,74 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish Release to GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.7'
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Run tests before release
+        run: go test -v ./...
+
+      - name: Build binaries for release
+        run: |
+          mkdir -p dist
+          
+          # Build for all platforms with version info
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w -X complianceguard/cmd.version=${{ steps.get_version.outputs.VERSION }}" -o dist/complianceguard-darwin-amd64 .
+          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X complianceguard/cmd.version=${{ steps.get_version.outputs.VERSION }}" -o dist/complianceguard-darwin-arm64 .
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w -X complianceguard/cmd.version=${{ steps.get_version.outputs.VERSION }}" -o dist/complianceguard-linux-amd64 .
+          GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X complianceguard/cmd.version=${{ steps.get_version.outputs.VERSION }}" -o dist/complianceguard-linux-arm64 .
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X complianceguard/cmd.version=${{ steps.get_version.outputs.VERSION }}" -o dist/complianceguard-windows-amd64.exe .
+          GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X complianceguard/cmd.version=${{ steps.get_version.outputs.VERSION }}" -o dist/complianceguard-windows-arm64.exe .
+
+      - name: Create release archives
+        run: |
+          cd dist
+          tar czf complianceguard-darwin-amd64.tar.gz complianceguard-darwin-amd64
+          tar czf complianceguard-darwin-arm64.tar.gz complianceguard-darwin-arm64
+          tar czf complianceguard-linux-amd64.tar.gz complianceguard-linux-amd64
+          tar czf complianceguard-linux-arm64.tar.gz complianceguard-linux-arm64
+          zip complianceguard-windows-amd64.zip complianceguard-windows-amd64.exe
+          zip complianceguard-windows-arm64.zip complianceguard-windows-arm64.exe
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz *.zip > checksums.txt
+          cat checksums.txt
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/complianceguard-darwin-amd64.tar.gz
+            dist/complianceguard-darwin-arm64.tar.gz
+            dist/complianceguard-linux-amd64.tar.gz
+            dist/complianceguard-linux-arm64.tar.gz
+            dist/complianceguard-windows-amd64.zip
+            dist/complianceguard-windows-arm64.zip
+            dist/checksums.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
